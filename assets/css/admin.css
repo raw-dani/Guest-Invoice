@@ -1,0 +1,170 @@
+/* WHMCS Guest Invoice Admin Stylesheet */
+.guestinvoice-admin {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin-top: 15px;
+}
+
+.gi-header {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.gi-badge {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+    margin-bottom: 6px;
+}
+
+.gi-header-title h2 {
+    margin: 4px 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.gi-subtitle {
+    margin: 4px 0 0 0;
+    color: #64748b;
+    font-size: 14px;
+}
+
+/* Tabs */
+.gi-nav-tabs {
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 20px;
+}
+
+.gi-nav-tabs > li > a {
+    font-weight: 600;
+    color: #475569;
+    border-radius: 8px 8px 0 0;
+    padding: 10px 18px;
+}
+
+.gi-nav-tabs > li.active > a {
+    color: #2563eb !important;
+    border-color: #e2e8f0 #e2e8f0 transparent !important;
+    border-bottom: 2px solid #2563eb !important;
+}
+
+/* Panels */
+.gi-panel {
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.gi-panel .panel-heading {
+    border-radius: 9px 9px 0 0;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 14px 20px;
+}
+
+.gi-panel .panel-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+/* Stats Cards */
+.gi-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.gi-stat-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.gi-stat-num {
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+}
+
+.gi-stat-label {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+/* Copy Box */
+.gi-copy-box {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0 6px 0;
+}
+
+.gi-copy-box input {
+    flex: 1;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+/* Alerts and Callouts */
+.gi-callout {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid;
+}
+
+.gi-callout-success {
+    background: #f0fdf4;
+    border-left-color: #22c55e;
+    color: #15803d;
+}
+
+.gi-callout-info {
+    background: #eff6ff;
+    border-left-color: #3b82f6;
+    color: #1d4ed8;
+}
+
+.gi-alert {
+    padding: 12px 18px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+.gi-alert-success {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.gi-alert-danger {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.gi-alert-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
