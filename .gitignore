@@ -1,0 +1,19 @@
+# Vendor & Composer
+/vendor/
+composer.phar
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & Temporary files
+*.log
+.env
+.env.local
+/scratch/
+*.tmp
