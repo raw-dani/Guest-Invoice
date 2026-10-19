@@ -83,8 +83,22 @@ class InvoiceService
             $subtotal = (float)$invoice->subtotal;
             $tax = (float)$invoice->tax;
             $tax2 = (float)$invoice->tax2;
+            $taxRate = (float)($invoice->taxrate ?? 0);
+            $taxRate2 = (float)($invoice->taxrate2 ?? 0);
             $credit = (float)$invoice->credit;
             $balanceDue = max(0.0, round($total - $totalPaid, 2));
+
+            $hasTaxedItems = false;
+            foreach ($lineItems as $li) {
+                if (!empty($li['taxed'])) {
+                    $hasTaxedItems = true;
+                    break;
+                }
+            }
+
+            // Friendly dates (e.g. Tuesday, October 13th, 2026)
+            $dateFriendly = self::formatFriendlyDate($invoice->date);
+            $dueDateFriendly = self::formatFriendlyDate($invoice->duedate);
 
             // Format client details (privacy-safe, no internal notes or sensitive data)
             $clientDetails = [
@@ -101,31 +115,58 @@ class InvoiceService
             ];
 
             // Company billing info and logo from WHMCS configuration
-            $companyName = self::getWhmcsConfig('CompanyName', 'Billing Department');
+            $companyName = self::getWhmcsConfig('CompanyName', 'PT. EIKON Technology');
             $payToText = self::getWhmcsConfig('InvoicePayTo', '');
             $logoUrl = self::getWhmcsConfig('LogoURL', '');
+
+            // Ensure VAT Number 02.825.020.7-604.000 is present in Pay To
+            $vatNumber = '02.825.020.7-604.000';
+            if (empty($payToText)) {
+                $payToText = "PT. EIKON Technology\nJl Simpang Darmo Permai Utara No.33a, Rt 000, Rw 000\nPradah Kalikendal, Dukuh Pakis\nKota Surabaya, Jawa Timur 60226\nPhone: +62 21 5086 1517\nVAT Number: " . $vatNumber;
+            } elseif (stripos($payToText, 'VAT Number') === false) {
+                $payToText = trim($payToText) . "\nVAT Number: " . $vatNumber;
+            }
+
+            // Retrieve bank details for offline payment if applicable
+            $bankDetails = self::getOfflinePaymentDetails($invoice->paymentmethod, $invoice->id);
+
+            // Determine tax label
+            $taxLabel = ($taxRate > 0) ? number_format($taxRate, 2) . '% PPN' : 'Pajak (Tax)';
+            if ($taxRate2 > 0) {
+                $taxLabel2 = number_format($taxRate2, 2) . '% PPN 2';
+            } else {
+                $taxLabel2 = 'Pajak 2';
+            }
 
             return [
                 'id' => (int)$invoice->id,
                 'userid' => (int)$invoice->userid,
                 'invoicenum' => !empty($invoice->invoicenum) ? $invoice->invoicenum : (string)$invoice->id,
                 'date' => $invoice->date,
+                'date_friendly' => $dateFriendly,
                 'duedate' => $invoice->duedate,
+                'duedate_friendly' => $dueDateFriendly,
                 'datepaid' => $invoice->datepaid,
                 'subtotal' => $subtotal,
                 'subtotal_formatted' => $prefix . number_format($subtotal, 2) . $suffix,
                 'credit' => $credit,
                 'credit_formatted' => $prefix . number_format($credit, 2) . $suffix,
                 'tax' => $tax,
+                'taxrate' => $taxRate,
+                'tax_label' => $taxLabel,
                 'tax_formatted' => $prefix . number_format($tax, 2) . $suffix,
                 'tax2' => $tax2,
+                'taxrate2' => $taxRate2,
+                'tax2_label' => $taxLabel2,
                 'tax2_formatted' => $prefix . number_format($tax2, 2) . $suffix,
+                'has_taxed_items' => $hasTaxedItems,
                 'total' => $total,
                 'total_formatted' => $prefix . number_format($total, 2) . $suffix,
                 'balance' => $balanceDue,
                 'balance_formatted' => $prefix . number_format($balanceDue, 2) . $suffix,
                 'status' => ucfirst(strtolower($invoice->status)),
                 'paymentmethod' => $invoice->paymentmethod,
+                'payment_details' => $bankDetails,
                 'currency' => [
                     'code' => $currencyCode,
                     'prefix' => $prefix,
@@ -147,6 +188,7 @@ class InvoiceService
                 'company' => [
                     'name' => $companyName,
                     'payto' => $payToText,
+                    'vat_number' => $vatNumber,
                     'logo' => $logoUrl,
                 ],
                 'items' => $lineItems,
@@ -155,6 +197,47 @@ class InvoiceService
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Format a date into friendly readable form (e.g. Tuesday, October 13th, 2026).
+     */
+    public static function formatFriendlyDate(?string $dateStr): string
+    {
+        if (empty($dateStr) || $dateStr === '0000-00-00') {
+            return '';
+        }
+        $ts = strtotime($dateStr);
+        if ($ts === false) {
+            return $dateStr;
+        }
+        return date('l, F jS, Y', $ts);
+    }
+
+    /**
+     * Retrieve offline bank details if applicable.
+     */
+    private static function getOfflinePaymentDetails(string $gateway, int $invoiceId): string
+    {
+        $gw = strtolower(trim($gateway));
+        if ($gw !== 'banktransfer' && strpos($gw, 'bank') === false && strpos($gw, 'offline') === false) {
+            return '';
+        }
+
+        try {
+            $row = Capsule::table('tblpaymentgateways')
+                ->where('gateway', $gateway)
+                ->whereIn('setting', ['bankdetails', 'instructions', 'Bank Details', 'bank_details'])
+                ->first();
+
+            if ($row && !empty($row->value)) {
+                $details = $row->value;
+                $details = str_replace(['<br />', '<br/>', '<br>'], "\n", $details);
+                return trim(strip_tags($details));
+            }
+        } catch (\Throwable $e) {}
+
+        return "Bank BCA - KCP Darmo Indah Timur - Surabaya\nPT. EIKON Technology\nA/C: 4700 281 987 (IDR)\nReference Number: " . $invoiceId;
     }
 
     /**

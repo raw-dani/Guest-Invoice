@@ -34,150 +34,172 @@
         </div>
     </div>
 
-    {* Main Invoice Card *}
-    <div class="gi-invoice-card">
-        {* Status Banner *}
-        <div class="gi-invoice-header">
-            <div>
-                <h1 class="gi-invoice-title">Tagihan #{$invoice.invoicenum}</h1>
-                <div class="gi-meta-row">
-                    <span>Tanggal Terbit: <strong>{$invoice.date}</strong></span>
-                    <span class="gi-dot">•</span>
-                    <span>Jatuh Tempo: <strong>{$invoice.duedate}</strong></span>
-                </div>
-            </div>
-            <div>
-                {if $invoice.status eq 'Paid'}
-                    <span class="gi-status-badge gi-status-paid">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        Lunas
-                    </span>
-                {elseif $invoice.status eq 'Unpaid'}
-                    <span class="gi-status-badge gi-status-unpaid">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        Belum Dibayar
-                    </span>
-                {elseif $invoice.status eq 'Overdue'}
-                    <span class="gi-status-badge gi-status-overdue">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        Jatuh Tempo
-                    </span>
+    {* Main Invoice Card Styled to match WHMCS Official Invoice Template *}
+    <div class="gi-invoice-card wh-invoice-card">
+        {* 1. Top Header: Logo on left, Big Status & Bank Details on right *}
+        <div class="wh-header-row">
+            <div class="wh-logo-col">
+                {if $invoice.company.logo}
+                    <img src="{$invoice.company.logo|escape}" alt="{$invoice.company.name|escape}" class="wh-company-logo">
                 {else}
-                    <span class="gi-status-badge gi-status-other">{$invoice.status}</span>
+                    <div class="wh-company-name-fallback">{$invoice.company.name|escape}</div>
                 {/if}
+                <h1 class="wh-invoice-number">Invoice #{$invoice.invoicenum}</h1>
             </div>
-        </div>
-
-        {* Billing Details: Pay To & Invoiced To *}
-        <div class="gi-billing-grid">
-            <div class="gi-billing-col">
-                <span class="gi-section-subtitle">Diterbitkan Oleh:</span>
-                <div class="gi-entity-name">{$invoice.company.name|escape}</div>
-                {if $invoice.company.payto}
-                    <div class="gi-entity-address">{$invoice.company.payto|nl2br}</div>
-                {/if}
-            </div>
-            <div class="gi-billing-col">
-                <span class="gi-section-subtitle">Ditagihkan Kepada:</span>
-                <div class="gi-entity-name">{$invoice.client.fullname|escape}</div>
-                {if $invoice.client.companyname}
-                    <div class="gi-entity-sub">{$invoice.client.companyname|escape}</div>
-                {/if}
-                <div class="gi-entity-address">
-                    {if $invoice.client.address1}{$invoice.client.address1|escape}<br>{/if}
-                    {if $invoice.client.city}{$invoice.client.city|escape}, {/if}
-                    {if $invoice.client.state}{$invoice.client.state|escape} {/if}
-                    {if $invoice.client.postcode}{$invoice.client.postcode|escape}<br>{/if}
-                    {if $invoice.client.country}{$invoice.client.country|escape}{/if}
+            <div class="wh-status-col text-right">
+                <div class="wh-status-title status-{$invoice.status|lower}">
+                    {$invoice.status|upper}
                 </div>
-                <div class="gi-entity-email">{$invoice.client.email|escape}</div>
+                <div class="wh-due-date">
+                    Due Date: {if $invoice.duedate_friendly}{$invoice.duedate_friendly}{else}{$invoice.duedate}{/if}
+                </div>
+                {if $invoice.payment_details}
+                    <div class="wh-payment-details-box">
+                        {$invoice.payment_details|nl2br}
+                    </div>
+                {/if}
             </div>
         </div>
 
-        {* Line Items Table *}
-        <div class="gi-table-wrapper">
-            <table class="gi-table">
+        {* 2. Row: Invoiced To & Pay To *}
+        <div class="wh-addresses-row">
+            <div class="wh-invoiced-to-col">
+                <div class="wh-addr-heading">Invoiced To</div>
+                <div class="wh-addr-body">
+                    {if $invoice.client.companyname}
+                        <div class="wh-company-client">{$invoice.client.companyname|escape}</div>
+                    {/if}
+                    <div class="wh-client-name">{$invoice.client.fullname|escape}</div>
+                    {if $invoice.client.address1}<div>{$invoice.client.address1|escape}</div>{/if}
+                    {if $invoice.client.address2}<div>{$invoice.client.address2|escape}</div>{/if}
+                    <div>
+                        {if $invoice.client.city}{$invoice.client.city|escape}, {/if}
+                        {if $invoice.client.state}{$invoice.client.state|escape}, {/if}
+                        {$invoice.client.postcode|escape}
+                    </div>
+                    {if $invoice.client.country}<div>{$invoice.client.country|escape}</div>{/if}
+                </div>
+            </div>
+            <div class="wh-pay-to-col text-right">
+                <div class="wh-addr-heading">Pay To</div>
+                <div class="wh-addr-body">
+                    {$invoice.company.payto|nl2br}
+                </div>
+            </div>
+        </div>
+
+        {* 3. Row: Invoice Date & Payment Method *}
+        <div class="wh-dates-row">
+            <div class="wh-date-col">
+                <div class="wh-addr-heading">Invoice Date</div>
+                <div class="wh-date-val">
+                    {if $invoice.date_friendly}{$invoice.date_friendly}{else}{$invoice.date}{/if}
+                </div>
+            </div>
+            <div class="wh-method-col text-right">
+                <div class="wh-addr-heading">Payment Method</div>
+                <div class="wh-method-val">
+                    <span class="wh-payment-method-badge">
+                        {if $invoice.paymentmethod eq 'banktransfer'}Offline Payment{else}{$invoice.paymentmethod|ucfirst}{/if}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        {* 4. Panel: Invoice Items *}
+        <div class="wh-items-panel">
+            <div class="wh-items-panel-header">Invoice Items</div>
+            <div class="wh-table-responsive">
+                <table class="wh-items-table">
+                    <thead>
+                        <tr>
+                            <th class="wh-th-desc">Description</th>
+                            <th class="wh-th-amt text-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {foreach from=$invoice.items item=item}
+                            <tr>
+                                <td class="wh-td-desc">
+                                    {$item.description|escape|nl2br}
+                                    {if $item.taxed}<span class="wh-tax-star"> *</span>{/if}
+                                </td>
+                                <td class="wh-td-amt text-right">
+                                    {$item.amount_formatted}
+                                </td>
+                            </tr>
+                        {foreachelse}
+                            <tr>
+                                <td colspan="2" class="text-center" style="padding: 16px; color: #888;">No line items found.</td>
+                            </tr>
+                        {/foreach}
+                    </tbody>
+                    <tfoot>
+                        <tr class="wh-row-subtotal">
+                            <td class="text-right"><strong>Sub Total</strong></td>
+                            <td class="text-right">{$invoice.subtotal_formatted}</td>
+                        </tr>
+                        {if $invoice.tax gt 0}
+                            <tr class="wh-row-tax">
+                                <td class="text-right"><strong>{$invoice.tax_label}</strong></td>
+                                <td class="text-right">{$invoice.tax_formatted}</td>
+                            </tr>
+                        {/if}
+                        {if $invoice.tax2 gt 0}
+                            <tr class="wh-row-tax">
+                                <td class="text-right"><strong>{$invoice.tax2_label}</strong></td>
+                                <td class="text-right">{$invoice.tax2_formatted}</td>
+                            </tr>
+                        {/if}
+                        {if $invoice.credit gt 0}
+                            <tr class="wh-row-credit">
+                                <td class="text-right"><strong>Credit</strong></td>
+                                <td class="text-right">{$invoice.credit_formatted}</td>
+                            </tr>
+                        {/if}
+                        <tr class="wh-row-total">
+                            <td class="text-right"><strong>Total</strong></td>
+                            <td class="text-right"><strong>{$invoice.total_formatted}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        {if $invoice.has_taxed_items}
+            <div class="wh-tax-note">* Indicates a taxed item.</div>
+        {/if}
+
+        {* 5. Transactions Table *}
+        <div class="wh-transactions-wrapper">
+            <table class="wh-trans-table">
                 <thead>
                     <tr>
-                        <th style="width: 70%;">Deskripsi Layanan / Produk</th>
-                        <th style="width: 30%; text-align: right;">Jumlah</th>
+                        <th class="text-left" style="width: 25%;">Transaction Date</th>
+                        <th class="text-left" style="width: 25%;">Gateway</th>
+                        <th class="text-left" style="width: 25%;">Transaction ID</th>
+                        <th class="text-right" style="width: 25%;">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {foreach from=$invoice.items item=item}
+                    {foreach from=$invoice.transactions item=tx}
                         <tr>
-                            <td>
-                                <div class="gi-item-desc">{$item.description|escape|nl2br}</div>
-                            </td>
-                            <td style="text-align: right; font-weight: 500;">
-                                {$item.amount_formatted}
-                            </td>
+                            <td>{$tx.date}</td>
+                            <td>{$tx.gateway|escape}</td>
+                            <td>{$tx.transid|escape}</td>
+                            <td class="text-right">{$tx.amount_formatted}</td>
                         </tr>
                     {foreachelse}
                         <tr>
-                            <td colspan="2" style="text-align: center; color: #94a3b8;">Tidak ada rincian item.</td>
+                            <td colspan="4" class="text-center wh-no-trans">No Related Transactions Found</td>
                         </tr>
                     {/foreach}
                 </tbody>
             </table>
-        </div>
-
-        {* Financial Breakdown / Totals *}
-        <div class="gi-summary-section">
-            <div class="gi-summary-box">
-                <div class="gi-summary-row">
-                    <span>Subtotal</span>
-                    <span>{$invoice.subtotal_formatted}</span>
-                </div>
-                {if $invoice.tax gt 0}
-                    <div class="gi-summary-row">
-                        <span>Pajak (Tax)</span>
-                        <span>{$invoice.tax_formatted}</span>
-                    </div>
-                {/if}
-                {if $invoice.credit gt 0}
-                    <div class="gi-summary-row">
-                        <span>Kredit Diterapkan</span>
-                        <span>-{$invoice.credit_formatted}</span>
-                    </div>
-                {/if}
-                <div class="gi-summary-row gi-summary-total">
-                    <span>Total Tagihan</span>
-                    <span>{$invoice.total_formatted}</span>
-                </div>
-                <div class="gi-summary-row gi-summary-balance">
-                    <span>Sisa Tagihan (Balance Due)</span>
-                    <span class="gi-highlight-balance">{$invoice.balance_formatted}</span>
-                </div>
+            <div class="wh-balance-row text-right">
+                <span class="wh-balance-label">Balance</span>
+                <span class="wh-balance-val">{$invoice.balance_formatted}</span>
             </div>
         </div>
-
-        {* Payments Received History *}
-        {if $invoice.transactions}
-            <div class="gi-transactions-box">
-                <h3 class="gi-subheading">Riwayat Pembayaran Diterima</h3>
-                <table class="gi-table-sm">
-                    <thead>
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>Metode</th>
-                            <th>ID Transaksi</th>
-                            <th style="text-align: right;">Nominal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {foreach from=$invoice.transactions item=tx}
-                            <tr>
-                                <td>{$tx.date}</td>
-                                <td>{$tx.gateway|escape}</td>
-                                <td><code>{$tx.transid|escape}</code></td>
-                                <td style="text-align: right; color: #059669; font-weight: bold;">{$tx.amount_formatted}</td>
-                            </tr>
-                        {/foreach}
-                    </tbody>
-                </table>
-            </div>
-        {/if}
 
         {* Payment Checkout Section (if payable) *}
         {if $is_payable}
