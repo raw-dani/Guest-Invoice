@@ -14,21 +14,30 @@ spl_autoload_register(function ($class) {
     }
     $relativeClass = substr($class, $len);
 
-    // Try standard casing
+    // 1. Try exact standard casing (e.g. Lib/Gateway/WhmcsNativeAdapter.php)
     $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
     if (file_exists($file)) {
         require_once $file;
         return;
     }
 
-    // Try lowercase directory segments (lib, controllers, migrations)
+    // 2. Try completely lowercase directories with exact ClassName
     $parts = explode('\\', $relativeClass);
     if (count($parts) > 1) {
         $className = array_pop($parts);
-        $dirs = array_map('strtolower', $parts);
-        $fileLower = $baseDir . implode('/', $dirs) . '/' . $className . '.php';
-        if (file_exists($fileLower)) {
-            require_once $fileLower;
+        $dirsLower = array_map('strtolower', $parts);
+        $fileLowerDirs = $baseDir . implode('/', $dirsLower) . '/' . $className . '.php';
+        if (file_exists($fileLowerDirs)) {
+            require_once $fileLowerDirs;
+            return;
+        }
+
+        // 3. Try mixed: 'lib' lowercase but subdirectories standard (e.g. lib/Gateway/WhmcsNativeAdapter.php)
+        $dirsMixed = $parts;
+        $dirsMixed[0] = strtolower($dirsMixed[0]);
+        $fileMixed = $baseDir . implode('/', $dirsMixed) . '/' . $className . '.php';
+        if (file_exists($fileMixed)) {
+            require_once $fileMixed;
             return;
         }
     }

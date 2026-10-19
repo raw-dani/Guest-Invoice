@@ -100,9 +100,10 @@ class InvoiceService
                 'phonenumber' => !empty($client->phonenumber) ? self::maskPhoneNumber($client->phonenumber) : '',
             ];
 
-            // Company billing info from WHMCS configuration
+            // Company billing info and logo from WHMCS configuration
             $companyName = self::getWhmcsConfig('CompanyName', 'Billing Department');
             $payToText = self::getWhmcsConfig('InvoicePayTo', '');
+            $logoUrl = self::getWhmcsConfig('LogoURL', '');
 
             return [
                 'id' => (int)$invoice->id,
@@ -133,6 +134,7 @@ class InvoiceService
                 'company' => [
                     'name' => $companyName,
                     'payto' => $payToText,
+                    'logo' => $logoUrl,
                 ],
                 'items' => $lineItems,
                 'transactions' => $payments,

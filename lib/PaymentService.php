@@ -25,7 +25,7 @@ class PaymentService
             return new BankTransferAdapter($gatewayName);
         }
 
-        if (strpos($gw, 'midtrans') !== false) {
+        if (strpos($gw, 'midtrans') !== false || strpos($gw, 'veritrans') !== false) {
             return new MidtransAdapter($gatewayName);
         }
 
