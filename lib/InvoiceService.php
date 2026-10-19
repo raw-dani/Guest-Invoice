@@ -119,16 +119,18 @@ class InvoiceService
             $payToText = self::getWhmcsConfig('InvoicePayTo', '');
             $logoUrl = self::getWhmcsConfig('LogoURL', '');
 
-            // Ensure VAT Number 02.825.020.7-604.000 is present in Pay To
+            // Ensure clean multi-line Pay To with VAT Number: 02.825.020.7-604.000
             $vatNumber = '02.825.020.7-604.000';
             if (empty($payToText)) {
-                $payToText = "PT. EIKON Technology\nJl Simpang Darmo Permai Utara No.33a, Rt 000, Rw 000\nPradah Kalikendal, Dukuh Pakis\nKota Surabaya, Jawa Timur 60226\nPhone: +62 21 5086 1517\nVAT Number: " . $vatNumber;
-            } elseif (stripos($payToText, 'VAT Number') === false) {
-                $payToText = trim($payToText) . "\nVAT Number: " . $vatNumber;
+                $payToText = "PT. EIKON Technology\nJl Simpang Darmo Permai Utara\nNo.33a, Rt 000, Rw 000\nPradah Kalikendal, Dukuh Pakis\nKota Surabaya, Jawa Timur 60226\nPhone: +62 21 5086 1517\nVAT Number: " . $vatNumber;
+            } else {
+                if (stripos($payToText, 'VAT Number') === false && stripos($payToText, '02.825.020.7-604.000') === false) {
+                    $payToText = trim($payToText) . "\nVAT Number: " . $vatNumber;
+                }
             }
 
-            // Retrieve bank details for offline payment if applicable
-            $bankDetails = self::getOfflinePaymentDetails($invoice->paymentmethod, $invoice->id);
+            // Clean concise bank summary for header
+            $bankDetails = self::getOfflinePaymentDetails($invoice->paymentmethod, $invoice->invoicenum ?: (string)$invoice->id);
 
             // Determine tax label
             $taxLabel = ($taxRate > 0) ? number_format($taxRate, 2) . '% PPN' : 'Pajak (Tax)';
@@ -217,7 +219,7 @@ class InvoiceService
     /**
      * Retrieve offline bank details if applicable.
      */
-    private static function getOfflinePaymentDetails(string $gateway, int $invoiceId): string
+    private static function getOfflinePaymentDetails(string $gateway, $invoiceNum): string
     {
         $gw = strtolower(trim($gateway));
         if ($gw !== 'banktransfer' && strpos($gw, 'bank') === false && strpos($gw, 'offline') === false) {
@@ -231,13 +233,16 @@ class InvoiceService
                 ->first();
 
             if ($row && !empty($row->value)) {
-                $details = $row->value;
-                $details = str_replace(['<br />', '<br/>', '<br>'], "\n", $details);
-                return trim(strip_tags($details));
+                $raw = str_replace(['<br />', '<br/>', '<br>'], "\n", $row->value);
+                $lines = array_filter(array_map('trim', explode("\n", strip_tags($raw))));
+                // If it's a concise bank instruction (under 6 lines), use it
+                if (count($lines) > 0 && count($lines) <= 6) {
+                    return implode("\n", $lines);
+                }
             }
         } catch (\Throwable $e) {}
 
-        return "Bank BCA - KCP Darmo Indah Timur - Surabaya\nPT. EIKON Technology\nA/C: 4700 281 987 (IDR)\nReference Number: " . $invoiceId;
+        return "Bank BCA - KCP Darmo Indah Timur - Surabaya\nPT. EIKON Technology\nA/C: 4700 281 987 (IDR)\nReference Number: " . $invoiceNum;
     }
 
     /**

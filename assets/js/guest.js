@@ -1,10 +1,14 @@
 // Guest Invoice interactive scripts
 document.addEventListener('DOMContentLoaded', function () {
     // Interactive Gateway Selector Radio Cards
-    const gatewayCards = document.querySelectorAll('.gi-gateway-card');
+    const gatewayCards = document.querySelectorAll('.gi-gw-card, .gi-gateway-card');
     gatewayCards.forEach(function (card) {
         card.addEventListener('click', function () {
-            gatewayCards.forEach(c => c.classList.remove('active'));
+            gatewayCards.forEach(c => {
+                c.classList.remove('selected');
+                c.classList.remove('active');
+            });
+            this.classList.add('selected');
             this.classList.add('active');
             const radio = this.querySelector('input[type="radio"]');
             if (radio) {
