@@ -51,6 +51,7 @@ class TokenService
             $id = Capsule::table('mod_guestinvoice_tokens')->insertGetId([
                 'invoice_id' => $invoiceId,
                 'token_hash' => $tokenHash,
+                'raw_token' => $rawToken,
                 'status' => 'Active',
                 'created_at' => $now,
                 'expires_at' => $expiresAt,

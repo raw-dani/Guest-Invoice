@@ -7,6 +7,7 @@ use GuestInvoice\Lib\TokenService;
 use GuestInvoice\Lib\InvoiceService;
 use GuestInvoice\Lib\AuditLogger;
 use GuestInvoice\Lib\MailService;
+use GuestInvoice\Migrations\MigrationManager;
 
 class AdminController
 {
@@ -18,6 +19,9 @@ class AdminController
      */
     public static function handle(array $vars): string
     {
+        // Ensure schema is up to date (e.g. raw_token column)
+        MigrationManager::createTokensTable();
+
         $adminId = $_SESSION['adminid'] ?? null;
         $currentTab = $_GET['tab'] ?? 'dashboard';
         $action = $_POST['action'] ?? $_GET['action'] ?? '';
@@ -410,6 +414,7 @@ class AdminController
                                     <tr>
                                         <th>ID</th>
                                         <th>Invoice ID</th>
+                                        <th>Tautan Guest / Payment URL</th>
                                         <th>Status</th>
                                         <th>Dibuat Pada</th>
                                         <th>Kedaluwarsa</th>
@@ -420,12 +425,35 @@ class AdminController
                                 </thead>
                                 <tbody>
                                     <?php if ($d['tokens']->isEmpty()): ?>
-                                        <tr><td colspan="8" class="text-center text-muted">Belum ada data token tautan.</td></tr>
+                                        <tr><td colspan="9" class="text-center text-muted">Belum ada data token tautan.</td></tr>
                                     <?php endif; ?>
                                     <?php foreach ($d['tokens'] as $tok): ?>
+                                        <?php 
+                                            $hasRawToken = !empty($tok->raw_token);
+                                            $paymentUrl = $hasRawToken ? TokenService::buildGuestUrl($tok->raw_token) : '';
+                                        ?>
                                         <tr>
                                             <td>#<?= $tok->id ?></td>
                                             <td><a href="invoices.php?action=edit&id=<?= $tok->invoice_id ?>" target="_blank"><strong>#<?= $tok->invoice_id ?></strong> <i class="fa fa-external-link"></i></a></td>
+                                            <td style="min-width: 260px;">
+                                                <?php if ($hasRawToken && $tok->status === 'Active'): ?>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" readonly class="form-control" id="token-url-<?= $tok->id ?>" value="<?= htmlspecialchars($paymentUrl) ?>" style="font-family: monospace; font-size: 11px; background: #fff;" onclick="this.select()">
+                                                        <span class="input-group-btn">
+                                                            <button type="button" class="btn btn-default" title="Salin Tautan" onclick="copyGuestLink('token-url-<?= $tok->id ?>', this)">
+                                                                <i class="fa fa-copy"></i> Salin
+                                                            </button>
+                                                            <a href="<?= htmlspecialchars($paymentUrl) ?>" target="_blank" class="btn btn-info" title="Buka Halaman Guest">
+                                                                <i class="fa fa-external-link"></i>
+                                                            </a>
+                                                        </span>
+                                                    </div>
+                                                <?php elseif ($tok->status !== 'Active'): ?>
+                                                    <span class="text-muted" style="font-size: 12px; font-style: italic;"><i class="fa fa-lock"></i> Tautan nonaktif (<?= htmlspecialchars($tok->status) ?>)</span>
+                                                <?php else: ?>
+                                                    <span class="text-muted" style="font-size: 12px;"><em>Dibuat versi lama (token tersimpan ter-hash)</em></span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <span class="label label-<?= $tok->status === 'Active' ? 'success' : ($tok->status === 'Expired' ? 'warning' : 'danger') ?>">
                                                     <?= htmlspecialchars($tok->status) ?>

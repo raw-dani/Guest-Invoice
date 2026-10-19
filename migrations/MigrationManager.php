@@ -42,6 +42,7 @@ class MigrationManager
                 $table->increments('id');
                 $table->unsignedInteger('invoice_id')->index();
                 $table->string('token_hash', 64)->unique();
+                $table->string('raw_token', 128)->nullable();
                 $table->enum('status', ['Active', 'Revoked', 'Expired'])->default('Active')->index();
                 $table->dateTime('created_at');
                 $table->dateTime('expires_at')->index();
@@ -51,6 +52,13 @@ class MigrationManager
                 $table->unsignedInteger('access_count')->default(0);
                 $table->dateTime('updated_at');
             });
+        } else {
+            // Add raw_token column if migrating from previous version
+            if (!Capsule::schema()->hasColumn('mod_guestinvoice_tokens', 'raw_token')) {
+                Capsule::schema()->table('mod_guestinvoice_tokens', function ($table) {
+                    $table->string('raw_token', 128)->nullable()->after('token_hash');
+                });
+            }
         }
     }
 

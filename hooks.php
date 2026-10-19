@@ -125,6 +125,21 @@ add_hook('AdminInvoicesControlsOutput', 1, function ($vars) {
                         <span class="label label-success">Tautan Aktif Tersedia</span>
                         Berlaku hingga: <strong><?= $tokenRow->expires_at ?></strong> (Diakses: <?= $tokenRow->access_count ?>x)
                     </p>
+                    <?php if (!empty($tokenRow->raw_token)): 
+                        $quickUrl = TokenService::buildGuestUrl($tokenRow->raw_token);
+                    ?>
+                        <div class="input-group input-group-sm" style="margin-bottom: 10px; max-width: 600px;">
+                            <input type="text" readonly class="form-control" id="widget-gi-url-<?= $invoiceId ?>" value="<?= htmlspecialchars($quickUrl) ?>" style="font-family: monospace; font-size: 11px; background: #f8fafc;" onclick="this.select()">
+                            <span class="input-group-btn">
+                                <button type="button" class="btn btn-default" onclick="copyGuestLink('widget-gi-url-<?= $invoiceId ?>', this)">
+                                    <i class="fa fa-copy"></i> Salin Link
+                                </button>
+                                <a href="<?= htmlspecialchars($quickUrl) ?>" target="_blank" class="btn btn-info">
+                                    <i class="fa fa-external-link"></i> Buka
+                                </a>
+                            </span>
+                        </div>
+                    <?php endif; ?>
                     <div class="btn-group">
                         <form method="post" action="<?= $moduleUrl ?>&tab=tokens" style="display:inline-block;">
                             <input type="hidden" name="token" value="<?= $csrfToken ?>">
