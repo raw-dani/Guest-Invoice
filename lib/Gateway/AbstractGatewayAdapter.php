@@ -37,12 +37,28 @@ abstract class AbstractGatewayAdapter implements GatewayInterface
     protected function loadConfig(): void
     {
         try {
+            // WHMCS official helper function decrypts and loads gateway settings and module metadata
+            if (function_exists('getGatewayVariables')) {
+                $vars = getGatewayVariables($this->gatewayName);
+                if (is_array($vars) && !empty($vars)) {
+                    $this->config = $vars;
+                    return;
+                }
+            }
+
             $rows = Capsule::table('tblpaymentgateways')
                 ->where('gateway', $this->gatewayName)
                 ->get();
 
             foreach ($rows as $row) {
-                $this->config[$row->setting] = $row->value;
+                $val = $row->value;
+                if (function_exists('decrypt')) {
+                    $dec = decrypt($val);
+                    if ($dec !== false && $dec !== '') {
+                        $val = $dec;
+                    }
+                }
+                $this->config[$row->setting] = $val;
             }
         } catch (\Throwable $e) {
             $this->config = [];

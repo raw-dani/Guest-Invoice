@@ -74,10 +74,13 @@ class MidtransAdapter extends AbstractGatewayAdapter
             $orderId = 'INV-' . $invoice['id'] . '-' . time();
             $grossAmount = (int)round($invoice['balance']);
 
+            $rawClient = $invoice['raw_client'] ?? [];
             $client = $invoice['client'] ?? [];
             $nameParts = explode(' ', $client['fullname'] ?? 'Customer', 2);
-            $firstName = $nameParts[0] ?? 'Customer';
-            $lastName = $nameParts[1] ?? '';
+            $firstName = !empty($rawClient['firstname']) ? $rawClient['firstname'] : ($nameParts[0] ?? 'Customer');
+            $lastName = !empty($rawClient['lastname']) ? $rawClient['lastname'] : ($nameParts[1] ?? '');
+            $email = !empty($rawClient['email']) ? $rawClient['email'] : ($client['email'] ?? 'billing@domain.com');
+            $phone = !empty($rawClient['phonenumber']) ? $rawClient['phonenumber'] : ($client['phonenumber'] ?? '');
 
             $payload = [
                 'transaction_details' => [
@@ -87,8 +90,8 @@ class MidtransAdapter extends AbstractGatewayAdapter
                 'customer_details' => [
                     'first_name' => $firstName,
                     'last_name' => $lastName,
-                    'email' => $client['email'] ?? 'billing@domain.com',
-                    'phone' => $client['phonenumber'] ?? '',
+                    'email' => $email,
+                    'phone' => $phone,
                 ],
                 'callbacks' => [
                     'finish' => $returnUrl,

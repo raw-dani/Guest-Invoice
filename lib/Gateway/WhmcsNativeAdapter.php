@@ -23,8 +23,13 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
 
         $linkFunc = $gateway . '_link';
         if (function_exists($linkFunc)) {
+            $rawClient = $invoice['raw_client'] ?? [];
             $client = $invoice['client'] ?? [];
             $nameParts = explode(' ', $client['fullname'] ?? 'Customer', 2);
+            $firstName = !empty($rawClient['firstname']) ? $rawClient['firstname'] : ($nameParts[0] ?? 'Customer');
+            $lastName = !empty($rawClient['lastname']) ? $rawClient['lastname'] : ($nameParts[1] ?? '');
+            $email = !empty($rawClient['email']) ? $rawClient['email'] : ($client['email'] ?? '');
+            $phone = !empty($rawClient['phonenumber']) ? $rawClient['phonenumber'] : ($client['phonenumber'] ?? '');
 
             $params = array_merge($this->config, [
                 'invoiceid' => $invoice['id'],
@@ -34,15 +39,16 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
                 'description' => 'Invoice #' . $invoice['invoicenum'],
                 'returnurl' => $returnUrl,
                 'clientdetails' => [
-                    'firstname' => $nameParts[0] ?? 'Customer',
-                    'lastname' => $nameParts[1] ?? '',
-                    'email' => $client['email'] ?? '',
-                    'address1' => $client['address1'] ?? '',
-                    'city' => $client['city'] ?? '',
-                    'state' => $client['state'] ?? '',
-                    'postcode' => $client['postcode'] ?? '',
-                    'country' => $client['country'] ?? '',
-                    'phonenumber' => $client['phonenumber'] ?? '',
+                    'firstname' => $firstName,
+                    'lastname' => $lastName,
+                    'email' => $email,
+                    'address1' => $rawClient['address1'] ?? ($client['address1'] ?? ''),
+                    'address2' => $rawClient['address2'] ?? ($client['address2'] ?? ''),
+                    'city' => $rawClient['city'] ?? ($client['city'] ?? ''),
+                    'state' => $rawClient['state'] ?? ($client['state'] ?? ''),
+                    'postcode' => $rawClient['postcode'] ?? ($client['postcode'] ?? ''),
+                    'country' => $rawClient['country'] ?? ($client['country'] ?? ''),
+                    'phonenumber' => $phone,
                 ],
                 'systemurl' => \GuestInvoice\Lib\TokenService::getWhmcsSystemUrl(),
             ]);

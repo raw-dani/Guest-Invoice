@@ -131,6 +131,18 @@ class InvoiceService
                     'suffix' => $suffix,
                 ],
                 'client' => $clientDetails,
+                'raw_client' => [
+                    'firstname' => $client->firstname ?: 'Customer',
+                    'lastname' => $client->lastname ?: '',
+                    'email' => $client->email ?: '',
+                    'phonenumber' => $client->phonenumber ?: '',
+                    'address1' => $client->address1 ?: '',
+                    'address2' => $client->address2 ?: '',
+                    'city' => $client->city ?: '',
+                    'state' => $client->state ?: '',
+                    'postcode' => $client->postcode ?: '',
+                    'country' => $client->country ?: '',
+                ],
                 'company' => [
                     'name' => $companyName,
                     'payto' => $payToText,
