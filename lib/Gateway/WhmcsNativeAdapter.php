@@ -14,6 +14,9 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
     public function initiatePayment(array $invoice, string $returnUrl): array
     {
         $gateway = $this->gatewayName;
+        $invoiceId = (int)($invoice['id'] ?? 0);
+
+        self::ensureGatewayFunctionsLoaded();
 
         // Initialize WHMCS official gateway environment if function exists
         if (function_exists('loadGatewayFunctions')) {
@@ -26,9 +29,10 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
             require_once $gatewayFile;
         }
 
-        // Re-load variables using WHMCS official getGatewayVariables if available
+        // Re-load variables using WHMCS official getGatewayVariables with invoiceId if available
+        $this->loadConfig($invoiceId);
         if (function_exists('getGatewayVariables')) {
-            $vars = getGatewayVariables($gateway);
+            $vars = getGatewayVariables($gateway, $invoiceId);
             if (is_array($vars) && !empty($vars)) {
                 $this->config = array_merge($this->config, $vars);
             }
@@ -81,12 +85,40 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
             try {
                 $output = call_user_func($linkFunc, $params);
                 if (!empty($output)) {
-                    // 1. If output contains an action URL or window.location to external payment portal, extract and redirect directly
-                    if (preg_match('/(?:action=["\'](https?:\/\/[^"\']+)["\'])|(?:(?:location\.href|window\.location)\s*=\s*["\'](https?:\/\/[^"\']+)["\'])/i', $output, $m)) {
-                        $targetUrl = !empty($m[1]) ? $m[1] : (!empty($m[2]) ? $m[2] : '');
+                    // Check if module output contains an error message instead of an actual payment button/form
+                    $isError = (
+                        stripos($output, 'unexpected error') !== false ||
+                        stripos($output, 'Error (401)') !== false ||
+                        stripos($output, 'Unauthorized') !== false ||
+                        stripos($output, 'Midtrans Error') !== false ||
+                        (stripos($output, 'error') !== false && stripos($output, '<form') === false && stripos($output, '<button') === false && stripos($output, 'href=') === false)
+                    );
+
+                    if ($isError) {
+                        return [
+                            'success' => false,
+                            'error' => strip_tags($output),
+                        ];
+                    }
+
+                    // 1. If output contains a Midtrans Snap redirect URL (VT-Web), redirect immediately
+                    if (preg_match('/https?:\/\/app(?:\.sandbox)?\.midtrans\.com\/snap\/v2\/vtweb\/[a-zA-Z0-9_-]+/i', $output, $mSnap)) {
+                        return [
+                            'success' => true,
+                            'type' => 'redirect',
+                            'redirect_url' => html_entity_decode($mSnap[0]),
+                            'html' => null,
+                            'token' => null,
+                            'instructions' => null,
+                            'error' => null,
+                        ];
+                    }
+
+                    // 2. If output contains an action URL or window.location to external payment portal, extract and redirect directly
+                    if (preg_match('/(?:action=["\'](https?:\/\/[^"\']+)["\'])|(?:(?:location\.href|window\.location)\s*=\s*["\'](https?:\/\/[^"\']+)["\'])|(?:<a\s+[^>]*href=["\'](https?:\/\/[^"\']+)["\'])/i', $output, $m)) {
+                        $targetUrl = !empty($m[1]) ? $m[1] : (!empty($m[2]) ? $m[2] : (!empty($m[3]) ? $m[3] : ''));
                         if (!empty($targetUrl) && strpos($targetUrl, 'viewinvoice.php') === false) {
-                            // If it's a GET link / direct redirect, redirect directly
-                            if (stripos($output, 'method="post"') === false) {
+                            if (stripos($output, 'method="post"') === false || stripos($targetUrl, 'midtrans.com') !== false) {
                                 return [
                                     'success' => true,
                                     'type' => 'redirect',

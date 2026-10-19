@@ -17,29 +17,57 @@ class MidtransAdapter extends AbstractGatewayAdapter
         return ($val === 'production' || $val === 'on' || $val === '1' || $val === 'live');
     }
 
-    private function getServerKey(): string
+    private function getServerKey(int $invoiceId = 0): string
     {
+        self::ensureGatewayFunctionsLoaded();
+
         $keys = [
             'server_key', 'serverKey', 'merchant_server_key', 'serverkey',
             'apiKey', 'api_key', 'apikey', 'veritrans_server_key',
             'snap_server_key', 'production_server_key', 'sandbox_server_key'
         ];
 
+        // 1. Check loaded config
         foreach ($keys as $k) {
             if (!empty($this->config[$k])) {
-                return trim($this->config[$k]);
+                $val = trim($this->config[$k]);
+                // If it starts with typical Midtrans prefixes, return directly
+                if (strpos($val, 'SB-') === 0 || strpos($val, 'Mid-') === 0) {
+                    return $val;
+                }
             }
         }
 
-        // Also check if stored under alternative gateway table names (e.g. midtrans vs veritrans)
-        $altGateway = ($this->gatewayName === 'veritrans') ? 'midtrans' : 'veritrans';
+        // 2. Try official getGatewayVariables with invoiceId if available
+        if (function_exists('getGatewayVariables')) {
+            foreach ([$this->gatewayName, 'veritrans', 'midtrans'] as $gw) {
+                $vars = getGatewayVariables($gw, $invoiceId);
+                if (is_array($vars)) {
+                    foreach ($keys as $k) {
+                        if (!empty($vars[$k])) {
+                            return trim($vars[$k]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to tblpaymentgateways with decrypt
+        $altGateways = array_unique([$this->gatewayName, 'veritrans', 'midtrans']);
         try {
             $rows = Capsule::table('tblpaymentgateways')
-                ->where('gateway', $altGateway)
+                ->whereIn('gateway', $altGateways)
                 ->get();
             foreach ($rows as $row) {
                 if (in_array(strtolower($row->setting), array_map('strtolower', $keys), true) && !empty($row->value)) {
-                    return trim($row->value);
+                    $val = trim($row->value);
+                    if (function_exists('decrypt')) {
+                        $dec = decrypt($val);
+                        if (!empty($dec) && $dec !== false) {
+                            return trim($dec);
+                        }
+                    }
+                    return $val;
                 }
             }
         } catch (\Throwable $e) {}
@@ -49,23 +77,11 @@ class MidtransAdapter extends AbstractGatewayAdapter
 
     public function initiatePayment(array $invoice, string $returnUrl): array
     {
-        // 1. First, check if native gateway module (veritrans.php / midtrans.php) exists and produces a direct payment link
-        $nativeAdapter = new WhmcsNativeAdapter($this->gatewayName);
-        $nativeResult = $nativeAdapter->initiatePayment($invoice, $returnUrl);
-        
-        // If native module returns a valid redirect or HTML form, prioritize it
-        if ($nativeResult['success'] && ($nativeResult['type'] === 'redirect' || !empty($nativeResult['html']))) {
-            // If the redirect URL is not a local viewinvoice fallback (i.e. is actual gateway / payment URL), use it immediately!
-            if (!empty($nativeResult['redirect_url']) && strpos($nativeResult['redirect_url'], 'viewinvoice.php') === false) {
-                return $nativeResult;
-            }
-            if (!empty($nativeResult['html'])) {
-                return $nativeResult;
-            }
-        }
+        $invoiceId = (int)($invoice['id'] ?? 0);
+        $this->loadConfig($invoiceId);
 
-        // 2. Direct Midtrans Snap API fallback
-        $serverKey = $this->getServerKey();
+        // 1. Direct Midtrans Snap API call (Recommended for clean guest checkout)
+        $serverKey = $this->getServerKey($invoiceId);
         if (!empty($serverKey)) {
             $apiUrl = $this->isProduction()
                 ? 'https://app.midtrans.com/snap/v1/transactions'
@@ -112,16 +128,42 @@ class MidtransAdapter extends AbstractGatewayAdapter
                     'error' => null,
                 ];
             }
+
+            // If Sandbox returned 401 with this server key, try testing Production URL if key looks like Production key (or vice-versa)
+            if (isset($res['http_code']) && $res['http_code'] === 401) {
+                $isSandboxKey = (strpos($serverKey, 'SB-') === 0);
+                $altApiUrl = $isSandboxKey
+                    ? 'https://app.sandbox.midtrans.com/snap/v1/transactions'
+                    : 'https://app.midtrans.com/snap/v1/transactions';
+
+                if ($altApiUrl !== $apiUrl) {
+                    $altRes = $this->postJson($altApiUrl, $payload, ['Authorization: ' . $authHeader]);
+                    if ($altRes['success'] && !empty($altRes['data']['redirect_url'])) {
+                        return [
+                            'success' => true,
+                            'type' => 'redirect',
+                            'redirect_url' => $altRes['data']['redirect_url'],
+                            'token' => $altRes['data']['token'] ?? null,
+                            'instructions' => null,
+                            'html' => null,
+                            'error' => null,
+                        ];
+                    }
+                }
+            }
         }
 
-        // 3. Fallback to native module result if API call failed or serverKey is invalid
+        // 2. Native gateway module fallback (veritrans.php / midtrans.php)
+        $nativeAdapter = new WhmcsNativeAdapter($this->gatewayName);
+        $nativeResult = $nativeAdapter->initiatePayment($invoice, $returnUrl);
+
         if ($nativeResult['success']) {
             return $nativeResult;
         }
 
         return [
             'success' => false,
-            'error' => 'Koneksi ke Midtrans gagal (HTTP 401 - Kredensial Server Key salah atau environment Sandbox/Production tidak sesuai). Pastikan Server Key pada menu Payment Gateway WHMCS sudah benar.',
+            'error' => 'Koneksi ke Midtrans Snap gagal (' . ($res['error'] ?? ($nativeResult['error'] ?? 'HTTP 401 Unauthorized')) . '). Pastikan Server Key pada menu Payment Gateway WHMCS sudah sesuai.',
         ];
     }
 

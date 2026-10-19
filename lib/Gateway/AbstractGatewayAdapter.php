@@ -32,14 +32,36 @@ abstract class AbstractGatewayAdapter implements GatewayInterface
     }
 
     /**
+     * Ensure WHMCS official gateway functions are loaded.
+     */
+    protected static function ensureGatewayFunctionsLoaded(): void
+    {
+        if (!function_exists('getGatewayVariables') || !function_exists('loadGatewayFunctions')) {
+            $possiblePaths = [
+                defined('ROOTDIR') ? ROOTDIR . '/includes/gatewayfunctions.php' : '',
+                dirname(__DIR__, 3) . '/includes/gatewayfunctions.php',
+                dirname(__DIR__, 4) . '/includes/gatewayfunctions.php',
+            ];
+            foreach ($possiblePaths as $path) {
+                if (!empty($path) && file_exists($path)) {
+                    require_once $path;
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
      * Load gateway configuration from WHMCS tblpaymentgateways.
      */
-    protected function loadConfig(): void
+    protected function loadConfig(int $invoiceId = 0): void
     {
         try {
+            self::ensureGatewayFunctionsLoaded();
+
             // WHMCS official helper function decrypts and loads gateway settings and module metadata
             if (function_exists('getGatewayVariables')) {
-                $vars = getGatewayVariables($this->gatewayName);
+                $vars = getGatewayVariables($this->gatewayName, $invoiceId);
                 if (is_array($vars) && !empty($vars)) {
                     $this->config = $vars;
                     return;
