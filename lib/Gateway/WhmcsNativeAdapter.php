@@ -50,6 +50,25 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
             try {
                 $output = call_user_func($linkFunc, $params);
                 if (!empty($output)) {
+                    // 1. If output contains an action URL or window.location to external payment portal, extract and redirect directly
+                    if (preg_match('/(?:action=["\'](https?:\/\/[^"\']+)["\'])|(?:(?:location\.href|window\.location)\s*=\s*["\'](https?:\/\/[^"\']+)["\'])/i', $output, $m)) {
+                        $targetUrl = !empty($m[1]) ? $m[1] : (!empty($m[2]) ? $m[2] : '');
+                        if (!empty($targetUrl) && strpos($targetUrl, 'viewinvoice.php') === false) {
+                            // If it's a GET link / direct redirect, redirect directly
+                            if (stripos($output, 'method="post"') === false) {
+                                return [
+                                    'success' => true,
+                                    'type' => 'redirect',
+                                    'redirect_url' => html_entity_decode($targetUrl),
+                                    'html' => null,
+                                    'token' => null,
+                                    'instructions' => null,
+                                    'error' => null,
+                                ];
+                            }
+                        }
+                    }
+
                     return [
                         'success' => true,
                         'type' => 'html',

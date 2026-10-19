@@ -19,16 +19,50 @@ class MidtransAdapter extends AbstractGatewayAdapter
 
     private function getServerKey(): string
     {
-        return trim($this->config['server_key'] ?? $this->config['serverKey'] ?? $this->config['merchant_server_key'] ?? '');
+        $keys = [
+            'server_key', 'serverKey', 'merchant_server_key', 'serverkey',
+            'apiKey', 'api_key', 'apikey', 'veritrans_server_key',
+            'snap_server_key', 'production_server_key', 'sandbox_server_key'
+        ];
+
+        foreach ($keys as $k) {
+            if (!empty($this->config[$k])) {
+                return trim($this->config[$k]);
+            }
+        }
+
+        // Also check if stored under alternative gateway table names (e.g. midtrans vs veritrans)
+        $altGateway = ($this->gatewayName === 'veritrans') ? 'midtrans' : 'veritrans';
+        try {
+            $rows = Capsule::table('tblpaymentgateways')
+                ->where('gateway', $altGateway)
+                ->get();
+            foreach ($rows as $row) {
+                if (in_array(strtolower($row->setting), array_map('strtolower', $keys), true) && !empty($row->value)) {
+                    return trim($row->value);
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return '';
     }
 
     public function initiatePayment(array $invoice, string $returnUrl): array
     {
         $serverKey = $this->getServerKey();
+
+        // If direct Midtrans API Server Key is missing, try official WHMCS native module link
         if (empty($serverKey)) {
+            $nativeAdapter = new WhmcsNativeAdapter($this->gatewayName);
+            $nativeResult = $nativeAdapter->initiatePayment($invoice, $returnUrl);
+            if ($nativeResult['success']) {
+                // If native module returns HTML/button/form or redirect, return that directly
+                return $nativeResult;
+            }
+
             return [
                 'success' => false,
-                'error' => 'Midtrans Server Key is not configured in WHMCS Payment Gateway settings.',
+                'error' => 'Konfigurasi Server Key ' . ucfirst($this->gatewayName) . ' tidak ditemukan di WHMCS Payment Gateway settings.',
             ];
         }
 
