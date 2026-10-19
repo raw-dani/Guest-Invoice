@@ -103,3 +103,11 @@ Atau unduh berkas ZIP dan ekstrak ke `WHMCS_ROOT/modules/addons/guestinvoice`.
 2. Temukan **Guest Invoice & Payment**, klik **Activate**.
 3. Klik **Configure**, berikan centang akses ke grup administrator Anda (misal: *Full Administrator*), lalu klik **Save Changes**.
 4. Buka modul melalui menu **Addons** > **Guest Invoice & Payment** untuk mengatur preferensi masa berlaku dan otomasi.
+
+---
+
+## 📚 Dokumentasi Lanjutan
+- **[Dokumentasi Teknis & Arsitektur (TECHNICAL.md)](TECHNICAL.md)**: Arsitektur OOP, skema database, kriptografi token CSPRNG 256-bit, adapter payment gateway, sistem hooks, dan audit log.
+- **[Panduan Administrator (ADMIN_GUIDE.md)](ADMIN_GUIDE.md)**: Petunjuk konfigurasi panel admin, pembuatan tautan, dan pelacakan pembayaran.
+- **[Kompatibilitas Payment Gateway (PAYMENT_GATEWAY_COMPATIBILITY.md)](PAYMENT_GATEWAY_COMPATIBILITY.md)**: Panduan konfigurasi gateway Midtrans, Xendit, Tripay, DOKU, Duitku, dan transfer bank.
+- **[Keamanan & GDPR (SECURITY.md)](SECURITY.md)**: Spesifikasi sanitasi data, perlindungan rate limiting, dan privasi klien.
