@@ -15,10 +15,23 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
     {
         $gateway = $this->gatewayName;
 
+        // Initialize WHMCS official gateway environment if function exists
+        if (function_exists('loadGatewayFunctions')) {
+            loadGatewayFunctions($gateway);
+        }
+
         // Check if gateway module file exists in WHMCS
         $gatewayFile = dirname(__DIR__, 4) . '/gateways/' . $gateway . '.php';
         if (file_exists($gatewayFile)) {
             require_once $gatewayFile;
+        }
+
+        // Re-load variables using WHMCS official getGatewayVariables if available
+        if (function_exists('getGatewayVariables')) {
+            $vars = getGatewayVariables($gateway);
+            if (is_array($vars) && !empty($vars)) {
+                $this->config = array_merge($this->config, $vars);
+            }
         }
 
         $linkFunc = $gateway . '_link';
@@ -38,7 +51,20 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
                 'currency' => $invoice['currency']['code'] ?? 'USD',
                 'description' => 'Invoice #' . $invoice['invoicenum'],
                 'returnurl' => $returnUrl,
+                'systemurl' => \GuestInvoice\Lib\TokenService::getWhmcsSystemUrl(),
+                'userid' => $invoice['userid'] ?? ($rawClient['id'] ?? null),
+                'firstname' => $firstName,
+                'lastname' => $lastName,
+                'email' => $email,
+                'address1' => $rawClient['address1'] ?? ($client['address1'] ?? ''),
+                'address2' => $rawClient['address2'] ?? ($client['address2'] ?? ''),
+                'city' => $rawClient['city'] ?? ($client['city'] ?? ''),
+                'state' => $rawClient['state'] ?? ($client['state'] ?? ''),
+                'postcode' => $rawClient['postcode'] ?? ($client['postcode'] ?? ''),
+                'country' => $rawClient['country'] ?? ($client['country'] ?? ''),
+                'phonenumber' => $phone,
                 'clientdetails' => [
+                    'id' => $invoice['userid'] ?? ($rawClient['id'] ?? null),
                     'firstname' => $firstName,
                     'lastname' => $lastName,
                     'email' => $email,
@@ -50,7 +76,6 @@ class WhmcsNativeAdapter extends AbstractGatewayAdapter
                     'country' => $rawClient['country'] ?? ($client['country'] ?? ''),
                     'phonenumber' => $phone,
                 ],
-                'systemurl' => \GuestInvoice\Lib\TokenService::getWhmcsSystemUrl(),
             ]);
 
             try {

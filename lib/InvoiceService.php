@@ -107,6 +107,7 @@ class InvoiceService
 
             return [
                 'id' => (int)$invoice->id,
+                'userid' => (int)$invoice->userid,
                 'invoicenum' => !empty($invoice->invoicenum) ? $invoice->invoicenum : (string)$invoice->id,
                 'date' => $invoice->date,
                 'duedate' => $invoice->duedate,
