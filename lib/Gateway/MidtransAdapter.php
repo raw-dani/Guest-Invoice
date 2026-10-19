@@ -49,69 +49,76 @@ class MidtransAdapter extends AbstractGatewayAdapter
 
     public function initiatePayment(array $invoice, string $returnUrl): array
     {
-        $serverKey = $this->getServerKey();
-
-        // If direct Midtrans API Server Key is missing, try official WHMCS native module link
-        if (empty($serverKey)) {
-            $nativeAdapter = new WhmcsNativeAdapter($this->gatewayName);
-            $nativeResult = $nativeAdapter->initiatePayment($invoice, $returnUrl);
-            if ($nativeResult['success']) {
-                // If native module returns HTML/button/form or redirect, return that directly
+        // 1. First, check if native gateway module (veritrans.php / midtrans.php) exists and produces a direct payment link
+        $nativeAdapter = new WhmcsNativeAdapter($this->gatewayName);
+        $nativeResult = $nativeAdapter->initiatePayment($invoice, $returnUrl);
+        
+        // If native module returns a valid redirect or HTML form, prioritize it
+        if ($nativeResult['success'] && ($nativeResult['type'] === 'redirect' || !empty($nativeResult['html']))) {
+            // If the redirect URL is not a local viewinvoice fallback (i.e. is actual gateway / payment URL), use it immediately!
+            if (!empty($nativeResult['redirect_url']) && strpos($nativeResult['redirect_url'], 'viewinvoice.php') === false) {
                 return $nativeResult;
             }
-
-            return [
-                'success' => false,
-                'error' => 'Konfigurasi Server Key ' . ucfirst($this->gatewayName) . ' tidak ditemukan di WHMCS Payment Gateway settings.',
-            ];
+            if (!empty($nativeResult['html'])) {
+                return $nativeResult;
+            }
         }
 
-        $apiUrl = $this->isProduction()
-            ? 'https://app.midtrans.com/snap/v1/transactions'
-            : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+        // 2. Direct Midtrans Snap API fallback
+        $serverKey = $this->getServerKey();
+        if (!empty($serverKey)) {
+            $apiUrl = $this->isProduction()
+                ? 'https://app.midtrans.com/snap/v1/transactions'
+                : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
-        $orderId = 'INV-' . $invoice['id'] . '-' . time();
-        $grossAmount = (int)round($invoice['balance']);
+            $orderId = 'INV-' . $invoice['id'] . '-' . time();
+            $grossAmount = (int)round($invoice['balance']);
 
-        $client = $invoice['client'] ?? [];
-        $nameParts = explode(' ', $client['fullname'] ?? 'Customer', 2);
-        $firstName = $nameParts[0] ?? 'Customer';
-        $lastName = $nameParts[1] ?? '';
+            $client = $invoice['client'] ?? [];
+            $nameParts = explode(' ', $client['fullname'] ?? 'Customer', 2);
+            $firstName = $nameParts[0] ?? 'Customer';
+            $lastName = $nameParts[1] ?? '';
 
-        $payload = [
-            'transaction_details' => [
-                'order_id' => $orderId,
-                'gross_amount' => $grossAmount,
-            ],
-            'customer_details' => [
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'email' => $client['email'] ?? 'billing@domain.com',
-                'phone' => $client['phonenumber'] ?? '',
-            ],
-            'callbacks' => [
-                'finish' => $returnUrl,
-            ],
-        ];
-
-        $authHeader = 'Basic ' . base64_encode($serverKey . ':');
-        $res = $this->postJson($apiUrl, $payload, ['Authorization: ' . $authHeader]);
-
-        if (!$res['success'] || empty($res['data']['redirect_url'])) {
-            return [
-                'success' => false,
-                'error' => 'Midtrans Snap creation error: ' . ($res['error'] ?? 'Unknown gateway error'),
+            $payload = [
+                'transaction_details' => [
+                    'order_id' => $orderId,
+                    'gross_amount' => $grossAmount,
+                ],
+                'customer_details' => [
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $client['email'] ?? 'billing@domain.com',
+                    'phone' => $client['phonenumber'] ?? '',
+                ],
+                'callbacks' => [
+                    'finish' => $returnUrl,
+                ],
             ];
+
+            $authHeader = 'Basic ' . base64_encode($serverKey . ':');
+            $res = $this->postJson($apiUrl, $payload, ['Authorization: ' . $authHeader]);
+
+            if ($res['success'] && !empty($res['data']['redirect_url'])) {
+                return [
+                    'success' => true,
+                    'type' => 'redirect',
+                    'redirect_url' => $res['data']['redirect_url'],
+                    'token' => $res['data']['token'] ?? null,
+                    'instructions' => null,
+                    'html' => null,
+                    'error' => null,
+                ];
+            }
+        }
+
+        // 3. Fallback to native module result if API call failed or serverKey is invalid
+        if ($nativeResult['success']) {
+            return $nativeResult;
         }
 
         return [
-            'success' => true,
-            'type' => 'redirect',
-            'redirect_url' => $res['data']['redirect_url'],
-            'token' => $res['data']['token'] ?? null,
-            'instructions' => null,
-            'html' => null,
-            'error' => null,
+            'success' => false,
+            'error' => 'Koneksi ke Midtrans gagal (HTTP 401 - Kredensial Server Key salah atau environment Sandbox/Production tidak sesuai). Pastikan Server Key pada menu Payment Gateway WHMCS sudah benar.',
         ];
     }
 
