@@ -49,7 +49,7 @@ function guestinvoice_config(): array
         'name' => 'Guest Invoice & Payment',
         'description' => 'Secure public invoice viewing and online payment portal without login using cryptographic tokens.',
         'version' => '1.0.0',
-        'author' => 'Antigravity / WHMCS Engineering',
+        'author' => 'Rohmat Ali Wardani',
         'language' => 'english',
         'fields' => [
             'default_expiry_days' => [
