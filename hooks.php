@@ -100,99 +100,93 @@ add_hook('InvoiceDeleted', 1, function ($vars) {
 });
 
 /**
- * Hook: Add Guest Invoice action widget/button to Admin Invoice Details screen.
+ * Helper to render the Guest Invoice widget for an invoice ID
  */
-add_hook('AdminInvoicesControlsOutput', 1, function ($vars) {
-    try {
-        $invoiceId = (int)($vars['invoiceid'] ?? 0);
-        if ($invoiceId <= 0) {
-            return '';
-        }
+function guestinvoice_render_admin_widget(int $invoiceId): string {
+    $tokenRow = TokenService::getActiveTokenForInvoice($invoiceId);
+    $moduleUrl = 'addonmodules.php?module=guestinvoice';
+    $csrfToken = function_exists('generate_token') ? generate_token('plain') : '';
+    $defaultExpiry = (int)(Capsule::table('mod_guestinvoice_settings')
+        ->where('setting_key', 'default_expiry_days')
+        ->value('setting_value') ?? 30);
+    if ($defaultExpiry <= 0) {
+        $defaultExpiry = 30;
+    }
 
-        $tokenRow = TokenService::getActiveTokenForInvoice($invoiceId);
-        $moduleUrl = 'addonmodules.php?module=guestinvoice';
-        $csrfToken = function_exists('generate_token') ? generate_token('plain') : '';
-        $defaultExpiry = (int)(Capsule::table('mod_guestinvoice_settings')
-            ->where('setting_key', 'default_expiry_days')
-            ->value('setting_value') ?? 30);
-        if ($defaultExpiry <= 0) {
-            $defaultExpiry = 30;
-        }
+    ob_start();
+    ?>
+    <div id="guestinvoice-admin-widget-<?= $invoiceId ?>" class="panel panel-default" style="margin-top: 15px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.08); clear: both;">
+        <div class="panel-heading" style="background-color: #eff6ff; color: #1e40af; font-weight: bold; border-color: #bfdbfe; display: flex; justify-content: space-between; align-items: center; padding: 10px 15px;">
+            <span><i class="fa fa-key"></i> Guest Invoice &amp; Payment Access</span>
+            <span id="gi-badge-<?= $invoiceId ?>">
+                <?php if ($tokenRow): ?>
+                    <span class="label label-success"><i class="fa fa-check-circle"></i> Tautan Aktif</span>
+                <?php else: ?>
+                    <span class="label label-default">Belum Ada Tautan</span>
+                <?php endif; ?>
+            </span>
+        </div>
+        <div class="panel-body" style="background: #ffffff; padding: 14px 16px;">
+            <div id="gi-alert-<?= $invoiceId ?>" style="display:none; margin-bottom: 12px;" class="alert"></div>
 
-        ob_start();
-        ?>
-        <div id="guestinvoice-admin-widget-<?= $invoiceId ?>" class="panel panel-default" style="margin-top: 15px; border-radius: 6px; border: 1px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
-            <div class="panel-heading" style="background-color: #eff6ff; color: #1e40af; font-weight: bold; border-color: #bfdbfe; display: flex; justify-content: space-between; align-items: center;">
-                <span><i class="fa fa-key"></i> Guest Invoice & Payment Access</span>
-                <span id="gi-badge-<?= $invoiceId ?>">
-                    <?php if ($tokenRow): ?>
-                        <span class="label label-success"><i class="fa fa-check-circle"></i> Tautan Aktif</span>
-                    <?php else: ?>
-                        <span class="label label-default">Belum Ada Tautan</span>
-                    <?php endif; ?>
-                </span>
-            </div>
-            <div class="panel-body" style="background: #ffffff; padding: 14px 16px;">
-                <div id="gi-alert-<?= $invoiceId ?>" style="display:none; margin-bottom: 12px;" class="alert"></div>
+            <!-- STATE: ACTIVE TOKEN -->
+            <div id="gi-active-state-<?= $invoiceId ?>" style="<?= $tokenRow ? '' : 'display: none;' ?>">
+                <p style="margin-bottom: 8px; color: #334155; font-size: 13px;">
+                    Berlaku hingga: <strong id="gi-expires-text-<?= $invoiceId ?>"><?= $tokenRow ? $tokenRow->expires_at : '' ?></strong> 
+                    &bull; Diakses: <span id="gi-count-text-<?= $invoiceId ?>" class="badge badge-info"><?= $tokenRow ? (int)$tokenRow->access_count : 0 ?>x</span>
+                </p>
 
-                <!-- STATE: ACTIVE TOKEN -->
-                <div id="gi-active-state-<?= $invoiceId ?>" style="<?= $tokenRow ? '' : 'display: none;' ?>">
-                    <p style="margin-bottom: 8px; color: #334155; font-size: 13px;">
-                        Berlaku hingga: <strong id="gi-expires-text-<?= $invoiceId ?>"><?= $tokenRow ? $tokenRow->expires_at : '' ?></strong> 
-                        &bull; Diakses: <span id="gi-count-text-<?= $invoiceId ?>" class="badge badge-info"><?= $tokenRow ? (int)$tokenRow->access_count : 0 ?>x</span>
-                    </p>
-
-                    <?php
-                        $quickUrl = ($tokenRow && !empty($tokenRow->raw_token)) ? TokenService::buildGuestUrl($tokenRow->raw_token) : '';
-                    ?>
-                    <div class="input-group input-group-sm" style="margin-bottom: 12px; max-width: 650px;">
-                        <input type="text" readonly class="form-control" id="widget-gi-url-<?= $invoiceId ?>" value="<?= htmlspecialchars($quickUrl) ?>" style="font-family: Menlo, Monaco, Consolas, monospace; font-size: 11px; background: #f8fafc; font-weight: 600;" onclick="this.select()">
-                        <span class="input-group-btn">
-                            <button type="button" class="btn btn-primary" id="btn-copy-gi-<?= $invoiceId ?>" onclick="giCopyLink('<?= $invoiceId ?>')">
-                                <i class="fa fa-copy"></i> Salin Link
-                            </button>
-                            <a href="<?= htmlspecialchars($quickUrl) ?>" target="_blank" class="btn btn-default" id="gi-open-btn-<?= $invoiceId ?>" title="Buka tautan di tab baru">
-                                <i class="fa fa-external-link"></i> Buka
-                            </a>
-                        </span>
-                    </div>
-
-                    <div class="btn-toolbar" style="margin: 0;">
-                        <button type="button" class="btn btn-info btn-sm" id="btn-gi-email-<?= $invoiceId ?>" onclick="giSendEmail('<?= $invoiceId ?>')">
-                            <i class="fa fa-envelope"></i> Kirim Ulang Link ke Klien
+                <?php
+                    $quickUrl = ($tokenRow && !empty($tokenRow->raw_token)) ? TokenService::buildGuestUrl($tokenRow->raw_token) : '';
+                ?>
+                <div class="input-group input-group-sm" style="margin-bottom: 12px; max-width: 650px;">
+                    <input type="text" readonly class="form-control" id="widget-gi-url-<?= $invoiceId ?>" value="<?= htmlspecialchars($quickUrl) ?>" style="font-family: Menlo, Monaco, Consolas, monospace; font-size: 11px; background: #f8fafc; font-weight: 600;" onclick="this.select()">
+                    <span class="input-group-btn">
+                        <button type="button" class="btn btn-primary" id="btn-copy-gi-<?= $invoiceId ?>" onclick="giCopyLink('<?= $invoiceId ?>')">
+                            <i class="fa fa-copy"></i> Salin Link
                         </button>
-                        <button type="button" class="btn btn-danger btn-sm" id="btn-gi-revoke-<?= $invoiceId ?>" onclick="giRevokeToken('<?= $invoiceId ?>', <?= $tokenRow ? (int)$tokenRow->id : 0 ?>)">
-                            <i class="fa fa-ban"></i> Cabut Tautan
-                        </button>
-                        <button type="button" class="btn btn-warning btn-sm" onclick="giGenerateToken('<?= $invoiceId ?>', true)" title="Buat link baru dan ganti link lama">
-                            <i class="fa fa-refresh"></i> Generate Ulang
-                        </button>
-                        <a href="<?= $moduleUrl ?>&tab=tokens&search=<?= $invoiceId ?>" class="btn btn-default btn-sm">
-                            <i class="fa fa-sliders"></i> Detail Modul
+                        <a href="<?= htmlspecialchars($quickUrl) ?>" target="_blank" class="btn btn-default" id="gi-open-btn-<?= $invoiceId ?>" title="Buka tautan di tab baru">
+                            <i class="fa fa-external-link"></i> Buka
                         </a>
-                    </div>
+                    </span>
                 </div>
 
-                <!-- STATE: NO TOKEN -->
-                <div id="gi-empty-state-<?= $invoiceId ?>" style="<?= !$tokenRow ? '' : 'display: none;' ?>">
-                    <p style="margin-bottom: 10px; color: #64748b; font-size: 13px;">
-                        Belum ada tautan aktif untuk invoice ini. Klien tidak dapat melihat atau membayar tanpa login kecuali link dibuat.
-                    </p>
-                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-primary btn-sm" id="btn-gi-generate-<?= $invoiceId ?>" onclick="giGenerateToken('<?= $invoiceId ?>', false)">
-                            <i class="fa fa-bolt"></i> Generate Link Sekarang (Instan)
-                        </button>
-                        <a href="<?= $moduleUrl ?>&tab=tokens&search=<?= $invoiceId ?>" class="btn btn-default btn-sm">
-                            <i class="fa fa-sliders"></i> Detail Modul
-                        </a>
-                    </div>
+                <div class="btn-toolbar" style="margin: 0;">
+                    <button type="button" class="btn btn-info btn-sm" id="btn-gi-email-<?= $invoiceId ?>" onclick="giSendEmail('<?= $invoiceId ?>')">
+                        <i class="fa fa-envelope"></i> Kirim Ulang Link ke Klien
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" id="btn-gi-revoke-<?= $invoiceId ?>" onclick="giRevokeToken('<?= $invoiceId ?>', <?= $tokenRow ? (int)$tokenRow->id : 0 ?>)">
+                        <i class="fa fa-ban"></i> Cabut Tautan
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="giGenerateToken('<?= $invoiceId ?>', true)" title="Buat link baru dan ganti link lama">
+                        <i class="fa fa-refresh"></i> Generate Ulang
+                    </button>
+                    <a href="<?= $moduleUrl ?>&tab=tokens&search=<?= $invoiceId ?>" class="btn btn-default btn-sm">
+                        <i class="fa fa-sliders"></i> Detail Modul
+                    </a>
+                </div>
+            </div>
+
+            <!-- STATE: NO TOKEN -->
+            <div id="gi-empty-state-<?= $invoiceId ?>" style="<?= !$tokenRow ? '' : 'display: none;' ?>">
+                <p style="margin-bottom: 10px; color: #64748b; font-size: 13px;">
+                    Belum ada tautan aktif untuk invoice ini. Klien tidak dapat melihat atau membayar tanpa login kecuali link dibuat.
+                </p>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-gi-generate-<?= $invoiceId ?>" onclick="giGenerateToken('<?= $invoiceId ?>', false)">
+                        <i class="fa fa-bolt"></i> Generate Link Sekarang (Instan)
+                    </button>
+                    <a href="<?= $moduleUrl ?>&tab=tokens&search=<?= $invoiceId ?>" class="btn btn-default btn-sm">
+                        <i class="fa fa-sliders"></i> Detail Modul
+                    </a>
                 </div>
             </div>
         </div>
+    </div>
 
-        <script>
-        if (typeof window.giLoadedScripts === 'undefined') {
-            window.giLoadedScripts = true;
+    <script>
+    if (typeof window.giLoadedScripts === 'undefined') {
+        window.giLoadedScripts = true;
 
             function giShowNotice(invId, type, msg) {
                 var alertEl = document.getElementById('gi-alert-' + invId);
@@ -266,7 +260,6 @@ add_hook('AdminInvoicesControlsOutput', 1, function ($vars) {
                     }
 
                     if (data.status === 'success') {
-                        // Update field values
                         var urlInput = document.getElementById('widget-gi-url-' + invId);
                         if (urlInput) urlInput.value = data.url;
 
@@ -284,7 +277,6 @@ add_hook('AdminInvoicesControlsOutput', 1, function ($vars) {
                             revokeBtn.setAttribute('onclick', "giRevokeToken('" + invId + "', " + data.token_id + ")");
                         }
 
-                        // Update badges and visibility
                         var badge = document.getElementById('gi-badge-' + invId);
                         if (badge) badge.innerHTML = '<span class="label label-success"><i class="fa fa-check-circle"></i> Tautan Aktif</span>';
 
@@ -391,8 +383,130 @@ add_hook('AdminInvoicesControlsOutput', 1, function ($vars) {
             }
         }
         </script>
-        <?php
-        return ob_get_clean();
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * Hook 1: Standard WHMCS Hook to inject into invoice controls area
+ */
+add_hook('AdminInvoicesControlsOutput', 1, function ($vars) {
+    try {
+        $invoiceId = (int)($vars['invoiceid'] ?? 0);
+        if ($invoiceId <= 0) {
+            return '';
+        }
+        return guestinvoice_render_admin_widget($invoiceId);
+    } catch (\Throwable $e) {
+        return '';
+    }
+});
+
+/**
+ * Hook 2: Fallback Injection via AdminAreaFooterOutput
+ * Ensures the widget is ALWAYS rendered on invoices.php (under invoice summary / client details)
+ * even if WHMCS template does not render AdminInvoicesControlsOutput.
+ */
+add_hook('AdminAreaFooterOutput', 1, function ($vars) {
+    try {
+        $filename = $vars['filename'] ?? '';
+        $action = $_GET['action'] ?? '';
+        $invoiceId = (int)($_GET['id'] ?? 0);
+
+        if ($filename !== 'invoices' || $action !== 'edit' || $invoiceId <= 0) {
+            return '';
+        }
+
+        $widgetHtml = guestinvoice_render_admin_widget($invoiceId);
+        $encodedHtml = json_encode($widgetHtml);
+
+        return <<<HTML
+        <script type="text/javascript">
+        (function() {
+            function placeGuestInvoiceWidget() {
+                var widgetId = 'guestinvoice-admin-widget-{$invoiceId}';
+                var existingWidget = document.getElementById(widgetId);
+
+                var html = {$encodedHtml};
+                var wrapper = document.createElement('div');
+                wrapper.innerHTML = html;
+                var widgetNode = wrapper.firstElementChild;
+                var scriptNodes = wrapper.querySelectorAll('script');
+
+                if (!existingWidget) {
+                    // Try targeting Tab 1 container or invoice summary table
+                    var placed = false;
+                    var tab1 = document.getElementById('tab1box') || document.querySelector('[data-tab="1"]') || document.querySelector('#tab1');
+                    if (tab1) {
+                        tab1.appendChild(widgetNode);
+                        placed = true;
+                    }
+
+                    if (!placed) {
+                        var formTables = document.querySelectorAll('table.form');
+                        if (formTables.length > 0) {
+                            var targetTable = formTables[0];
+                            targetTable.parentNode.insertBefore(widgetNode, targetTable.nextSibling);
+                            placed = true;
+                        }
+                    }
+
+                    if (!placed) {
+                        var summaryBox = document.querySelector('.invoice-summary, .contentbox, .context-btn-container');
+                        if (summaryBox) {
+                            summaryBox.parentNode.insertBefore(widgetNode, summaryBox.nextSibling);
+                            placed = true;
+                        }
+                    }
+
+                    if (!placed) {
+                        var contentArea = document.querySelector('.contentarea, #contentarea, form[name="invoices"]');
+                        if (contentArea) {
+                            contentArea.appendChild(widgetNode);
+                            placed = true;
+                        }
+                    }
+
+                    // Execute any inner scripts from the injected widget
+                    scriptNodes.forEach(function(s) {
+                        var newScript = document.createElement('script');
+                        newScript.text = s.innerHTML;
+                        document.body.appendChild(newScript);
+                    });
+                }
+
+                // Add convenient Quick Button to top action buttons bar (next to "View as Client", "Print", "Download")
+                var topBtnBar = document.querySelector('.context-btn-container, .btn-container, .btn-group');
+                if (topBtnBar && !document.getElementById('top-gi-btn-{$invoiceId}')) {
+                    var quickBtn = document.createElement('button');
+                    quickBtn.type = 'button';
+                    quickBtn.id = 'top-gi-btn-{$invoiceId}';
+                    quickBtn.className = 'btn btn-primary btn-sm';
+                    quickBtn.style.marginLeft = '6px';
+                    quickBtn.innerHTML = '<i class="fa fa-key"></i> Guest Link';
+                    quickBtn.onclick = function() {
+                        var widget = document.getElementById(widgetId);
+                        if (widget) {
+                            widget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            widget.style.boxShadow = '0 0 10px #3b82f6';
+                            setTimeout(function() { widget.style.boxShadow = ''; }, 2000);
+                        } else if (typeof giGenerateToken === 'function') {
+                            giGenerateToken('{$invoiceId}', false);
+                        }
+                    };
+                    topBtnBar.appendChild(quickBtn);
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', placeGuestInvoiceWidget);
+            } else {
+                placeGuestInvoiceWidget();
+            }
+            setTimeout(placeGuestInvoiceWidget, 500);
+        })();
+        </script>
+HTML;
     } catch (\Throwable $e) {
         return '';
     }
