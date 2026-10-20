@@ -410,10 +410,22 @@ add_hook('AdminInvoicesControlsOutput', 1, function ($vars) {
 add_hook('AdminAreaFooterOutput', 1, function ($vars) {
     try {
         $filename = $vars['filename'] ?? '';
+        $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        $phpSelf = basename($_SERVER['PHP_SELF'] ?? '');
+
+        $isInvoicePage = ($filename === 'invoices' || $filename === 'invoices.php' || $scriptName === 'invoices.php' || $phpSelf === 'invoices.php');
+        if (!$isInvoicePage) {
+            return '';
+        }
+
         $action = $_GET['action'] ?? '';
         $invoiceId = (int)($_GET['id'] ?? 0);
+        if ($invoiceId <= 0 && isset($_GET['invoiceid'])) {
+            $invoiceId = (int)$_GET['invoiceid'];
+        }
 
-        if ($filename !== 'invoices' || $action !== 'edit' || $invoiceId <= 0) {
+        // Only inject on invoice edit/summary screen
+        if ($invoiceId <= 0) {
             return '';
         }
 
