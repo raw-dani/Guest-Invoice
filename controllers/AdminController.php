@@ -32,9 +32,92 @@ class AdminController
         $generatedLink = null;
 
         // Verify CSRF on POST actions
+        // Verify CSRF on POST actions
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (function_exists('check_token')) {
                 check_token();
+            }
+
+            // AJAX handlers for Admin Invoice Screen widget
+            if ($action === 'ajax_generate') {
+                header('Content-Type: application/json; charset=utf-8');
+                $invId = (int)($_POST['invoice_id'] ?? 0);
+                $expiry = (int)($_POST['expiry_days'] ?? 30);
+                if ($expiry <= 0) {
+                    $expiry = 30;
+                }
+
+                $res = TokenService::createToken($invId, $expiry, $adminId);
+                if ($res['success']) {
+                    $quickUrl = TokenService::buildGuestUrl($res['raw_token']);
+                    echo json_encode([
+                        'status' => 'success',
+                        'message' => 'Tautan guest invoice berhasil dibuat.',
+                        'raw_token' => $res['raw_token'],
+                        'url' => $quickUrl,
+                        'expires_at' => $res['expires_at'],
+                        'token_id' => $res['token_id'],
+                    ]);
+                } else {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => $res['error'] ?? 'Gagal membuat tautan guest invoice.',
+                    ]);
+                }
+                exit;
+            }
+
+            if ($action === 'ajax_revoke') {
+                header('Content-Type: application/json; charset=utf-8');
+                $tokenId = (int)($_POST['token_id'] ?? 0);
+                if ($tokenId > 0 && TokenService::revokeToken($tokenId, $adminId)) {
+                    echo json_encode([
+                        'status' => 'success',
+                        'message' => 'Tautan guest invoice berhasil dicabut.',
+                    ]);
+                } else {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Gagal mencabut tautan.',
+                    ]);
+                }
+                exit;
+            }
+
+            if ($action === 'ajax_send_email') {
+                header('Content-Type: application/json; charset=utf-8');
+                $invId = (int)($_POST['invoice_id'] ?? 0);
+                $tokenRow = TokenService::getActiveTokenForInvoice($invId);
+                if (!$tokenRow) {
+                    $newRes = TokenService::createToken($invId, 30, $adminId);
+                    if ($newRes['success']) {
+                        $tokenRow = (object)[
+                            'raw_token' => $newRes['raw_token'],
+                            'expires_at' => $newRes['expires_at'],
+                        ];
+                    }
+                }
+
+                if ($tokenRow && !empty($tokenRow->raw_token)) {
+                    $mailRes = MailService::sendGuestInvoiceLink($invId, $tokenRow->raw_token, $tokenRow->expires_at, $adminId);
+                    if ($mailRes['success']) {
+                        echo json_encode([
+                            'status' => 'success',
+                            'message' => 'Email berisi tautan guest invoice berhasil dikirim ke klien.',
+                        ]);
+                    } else {
+                        echo json_encode([
+                            'status' => 'error',
+                            'message' => 'Gagal mengirim email: ' . ($mailRes['error'] ?? 'Unknown error'),
+                        ]);
+                    }
+                } else {
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Tidak dapat menemukan atau membuat token untuk invoice ini.',
+                    ]);
+                }
+                exit;
             }
 
             // Handle Actions
